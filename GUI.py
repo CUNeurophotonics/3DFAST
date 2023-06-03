@@ -8,6 +8,7 @@ Created on Sun Jul 10 18:12:34 2022
 # General Stuff
 import tkinter
 import cv2
+
 import PIL.Image, PIL.ImageTk
 import os
 from skimage import io
@@ -28,9 +29,9 @@ from arena_api.enums import PixelFormat
 #from arena_api.__future__.save import Recorder
 from arena_api.callback import callback, callback_function
 
-from pycromanager import Bridge
+from pycromanager import Core
 
-import PySimpleGUI as sg
+
 
 # DMD Stuff -> DLP GUI Must be Closed! 
 from mcsim.expt_ctrl import dlp6500
@@ -42,6 +43,10 @@ import threading
 from multiprocessing import Value
 
 print("IMPORTS DONE")
+
+
+
+
 
 #############################################################################
 global start_Pos, stop_Pos, flag,ix, iy, drawing, display_img, fx, fy, DMD_Height, DMD_Width
@@ -90,6 +95,33 @@ def create_device_from_serial_number(serial_number):
         raise Exception(f"Serial number {serial_number} cannot be found")
         
     return device
+
+def convert_buffer_to_BGR8(buffer):
+
+    if (buffer.pixel_format == enums.PixelFormat.BGR8):
+        return buffer
+    print('Converting image buffer pixel format to BGR8 ')
+    return BufferFactory.convert(buffer, enums.PixelFormat.BGR8)
+
+buffer_BGR8 = None
+np_array_reshaped = None
+
+
+def snap_Image(device):
+    buffer = device.get_buffer()
+    buffer_BGR8 = convert_buffer_to_BGR8(buffer)
+    device.requeue_buffer(buffer)
+    buffer_bytes_per_pixel = int(len(buffer_BGR8.data)/(buffer_BGR8.width * buffer_BGR8.height))
+    np_array = np.asarray(buffer_BGR8.data, dtype=np.uint8)
+    np_array_reshaped = np_array.reshape(buffer_BGR8.height, buffer_BGR8.width, buffer_bytes_per_pixel)
+    cv2.imshow("window_title", np_array_reshaped)
+    BufferFactory.destroy(buffer_BGR8)
+
+
+
+
+
+
 
 
 def set_ROI(device, width, height, offset_X, offset_Y):
@@ -176,7 +208,8 @@ def set_Cam_Trigs(device, exposure_Time):
     
         
     print("Camera Triggers Set!")
-
+    
+""" DO NOT USE
 
 def rapid_Record(device, num_Frames):
     
@@ -189,10 +222,10 @@ def rapid_Record(device, num_Frames):
     # automate the calculation of max FPS whenever the device settings change
     nodemap['AcquisitionFrameRateEnable'].value = True
 
-    """
-    set FPS node to max FPS which was set to be automatically calculated
-    base on current device settings
-    """
+    
+   # set FPS node to max FPS which was set to be automatically calculated
+   # base on current device settings
+   
     nodemap['AcquisitionFrameRate'].value = nodemap['AcquisitionFrameRate'].max
 
     # max FPS according to the current settings
@@ -250,7 +283,7 @@ def rapid_Record(device, num_Frames):
 #device = create_device_from_serial_number("220600074")    
 #rapid_Record(device, 1000)
     
-
+"""
 def test_Circle(ix, iy, fx, fy):
 
     # Use this to find pixel mismatch with the FB pattern uploaded prior to aquisition 
@@ -506,6 +539,13 @@ def set_DMD_SIM(exposure_time_cam):
     return dmd
 
 
+
+
+
+
+
+
+
 def set_MM_DMD_Trigs():
     
     # Connect uManager
@@ -513,14 +553,33 @@ def set_MM_DMD_Trigs():
     mmc = bridge.get_core()
     
     #Trig1
-    mmc.set_property("TS_DAC01", "Blanking","On") 
+    mmc.set_property("TS_DAC01", "Blanking","On") #B/W
     mmc.set_property("TS_DAC01", "State","1")
     mmc.set_property("TS_DAC01", "Volts", str(3.3))
 
     #Trig2
-    #mmc.set_property("TS_DAC02", "Blanking","Off") 
+    #mmc.set_property("TS_DAC02", "Blanking","Off") #B/Y
     mmc.set_property("TS_DAC02", "State","1")
     mmc.set_property("TS_DAC02", "Volts", str(3.3))
+
+
+
+def set_MM_DMD_Trigs_BLUE():
+    
+    # Connect uManager
+    bridge = Bridge()
+    mmc = bridge.get_core()
+    
+    #Trig1
+    mmc.set_property("TS_TTL13", "Blanking","On") #B/W
+    mmc.set_property("TS_DAC01", "State","1")
+    #mmc.set_property("TS_DAC01", "Volts", str(3.3))
+
+    #Trig2
+    #mmc.set_property("TS_DAC02", "Blanking","Off") #B/Y
+    mmc.set_property("TS_DAC13", "State","1")
+    mmc.set_property("TS_DAC13", "Volts", str(3.3))
+
 
 
 def turn_Off__MM_Trigs():
@@ -910,7 +969,7 @@ def get_image_buffers(device, mmc, is_color_camera=False):
         start_Pos = cv2.getTrackbarPos("Z Position", "Image")/100
         print("Start Position: ", start_Pos)
     
-    cv2.createButton("Register Start Z", start_Button_Press, None, cv2.QT_PUSH_BUTTON,1)
+    cv2.createButton("Register Start Z", start_Button_Press, None, cv.QT_PUSH_BUTTON,1)
    
     
     def end_Button_Press(*args):
@@ -1016,8 +1075,10 @@ def get_image_buffers(device, mmc, is_color_camera=False):
 
 device = create_device_from_serial_number("220600074")
 
-bridge = Bridge()
-mmc = bridge.get_core()
+#bridge = Bridge()
+#mmc = bridge.get_core()
+
+mmc = Core()
 
 
 
@@ -1107,8 +1168,6 @@ system.destroy_device()
 # 4.5um is .1
 # .05V is 2.25 um 
 # Do LED measurements 
-
-
 
 
 
